@@ -1,0 +1,1389 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: |
+    API specification. Requests to an unknown route under `/api` return a 404
+    response using the `Error` schema with the message `API route not found`.
+    Requests with malformed JSON bodies return a 400 response using the `Error`
+    schema with the message `Malformed JSON request body`. Unexpected server
+    failures return a generic 500 response using the same schema. JSON request
+    bodies that exceed the parser's size limit return a 413 response using the
+    `Error` schema with the message `Request body too large`.
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: admin
+    description: Administrator account and instructor-access management
+  - name: questions
+    description: Published question delivery for learners
+  - name: instructor
+    description: Instructor question authoring and publishing
+  - name: practice
+    description: Learner practice sessions and progress
+  - name: Auth
+    description: Browser authentication and signed-in account state.
+paths:
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: listAdminUsers
+      summary: List accounts for administrator role management
+      responses:
+        "200":
+          description: User accounts and current roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+        "403":
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /admin/users/{id}/role:
+    patch:
+      tags: [admin]
+      operationId: updateInstructorAccess
+      summary: Grant or revoke a user's instructor role
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstructorAccessUpdate"
+      responses:
+        "200":
+          description: Updated account role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Administrator role or same-origin request required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /admin/users/{id}/admin-access:
+    post:
+      tags: [admin]
+      operationId: grantAdministratorAccess
+      summary: Grant administrator access to an existing account
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdministratorAccessGrantConfirmation"
+      responses:
+        "200":
+          description: Account after administrator access was granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          description: Explicit confirmation is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Administrator role or same-origin request required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The account already has administrator access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags: [admin]
+      operationId: revokeAdministratorAccess
+      summary: Revoke administrator access from an account
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Account after administrator access was revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          description: The acting administrator cannot revoke their own access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Administrator role or same-origin request required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Revocation would remove the last administrator or bootstrap access is still configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /admin/access-audit:
+    get:
+      tags: [admin]
+      operationId: listInstructorAccessAudit
+      summary: Search account role-change history
+      parameters:
+        - $ref: "#/components/parameters/AccessAuditAccount"
+        - $ref: "#/components/parameters/AccessAuditActor"
+      responses:
+        "200":
+          description: Matching role-change history, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InstructorAccessAuditEntry"
+        "403":
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "400":
+          description: Invalid account or actor filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      responses:
+        "200":
+          description: Authentication state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserEnvelope"
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start browser login
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to the identity provider
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete browser login
+      responses:
+        "302":
+          description: Redirect to the application
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: End the browser session
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to the identity provider
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /questions:
+    get:
+      operationId: listPublishedQuestions
+      tags: [questions]
+      summary: List published questions
+      description: Returns only published questions matching the learner's session filters.
+      parameters:
+        - $ref: "#/components/parameters/Domain"
+        - $ref: "#/components/parameters/Approach"
+        - $ref: "#/components/parameters/Difficulty"
+      responses:
+        "200":
+          description: Published questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /instructor/questions:
+    get:
+      operationId: listInstructorQuestions
+      tags: [instructor]
+      summary: List all questions for the instructor workspace
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/QuestionStatus"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Domain"
+        - $ref: "#/components/parameters/Approach"
+        - $ref: "#/components/parameters/Difficulty"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageOffset"
+      responses:
+        "200":
+          description: Instructor question library
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructorQuestionPage"
+        "400":
+          description: Invalid instructor question filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createQuestion
+      tags: [instructor]
+      summary: Create a question draft
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Created question draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "200":
+          description: Existing question returned for an idempotent retry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          description: Invalid question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Idempotency key was reused with different question content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: JSON request body exceeds the size limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /instructor/preferences:
+    get:
+      operationId: getInstructorPreferences
+      tags: [instructor]
+      summary: Get the signed-in instructor's workspace preferences
+      responses:
+        "200":
+          description: Instructor workspace preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructorPreferences"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Instructor role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      operationId: updateInstructorPreferences
+      tags: [instructor]
+      summary: Update the signed-in instructor's workspace preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstructorPreferencesUpdate"
+      responses:
+        "200":
+          description: Updated instructor workspace preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructorPreferences"
+        "400":
+          description: Invalid instructor preference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Instructor role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /instructor/questions/{id}:
+    patch:
+      operationId: updateQuestion
+      tags: [instructor]
+      summary: Update a question draft or published question
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionUpdate"
+      responses:
+        "200":
+          description: Updated question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "400":
+          description: Invalid question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: JSON request body exceeds the size limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Question not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /instructor/questions/{id}/publish:
+    post:
+      operationId: publishQuestion
+      tags: [instructor]
+      summary: Publish a question
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      responses:
+        "200":
+          description: Published question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "404":
+          description: Question not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /instructor/questions/{id}/archive:
+    post:
+      operationId: archiveQuestion
+      tags: [instructor]
+      summary: Archive a question
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      responses:
+        "200":
+          description: Archived question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "404":
+          description: Question not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /instructor/questions/{id}/restore:
+    post:
+      operationId: restoreQuestion
+      tags: [instructor]
+      summary: Restore an archived question as a draft
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      responses:
+        "200":
+          description: Restored draft question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+        "404":
+          description: Question not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Question is not archived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /practice/sessions:
+    get:
+      operationId: listPracticeSessions
+      tags: [practice]
+      summary: List a learner's completed practice sessions
+      responses:
+        "200":
+          description: Completed practice session history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeSessionSummary"
+        "400":
+          description: Learner identity is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createPracticeSession
+      tags: [practice]
+      summary: Start a learner practice session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PracticeSessionInput"
+      responses:
+        "201":
+          description: Started practice session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "400":
+          description: Invalid practice session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: JSON request body exceeds the size limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /practice/sessions/latest:
+    get:
+      operationId: getLatestPracticeSession
+      tags: [practice]
+      summary: Get the learner's latest completed session
+      responses:
+        "200":
+          description: Latest completed session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "404":
+          description: No completed session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /practice/sessions/in-progress:
+    get:
+      operationId: getInProgressPracticeSession
+      tags: [practice]
+      summary: List the learner's unfinished sessions
+      description: Finalizes expired timed sessions before returning all unfinished sessions.
+      responses:
+        "200":
+          description: Unfinished practice sessions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeSession"
+  /practice/sessions/{id}:
+    get:
+      operationId: getPracticeSession
+      tags: [practice]
+      summary: Get a learner practice session with its answers
+      parameters:
+        - $ref: "#/components/parameters/PracticeSessionId"
+      responses:
+        "200":
+          description: Practice session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "404":
+          description: Practice session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: savePracticeAnswer
+      tags: [practice]
+      summary: Save an answer in a learner practice session
+      parameters:
+        - $ref: "#/components/parameters/PracticeSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PracticeAnswerInput"
+      responses:
+        "200":
+          description: Saved practice answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeAnswer"
+        "400":
+          description: Invalid practice answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: JSON request body exceeds the size limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Practice session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /practice/sessions/{id}/complete:
+    post:
+      operationId: completePracticeSession
+      tags: [practice]
+      summary: Complete a learner practice session
+      description: Completes the session manually, or records time_expired when a timed session's server-side duration has elapsed.
+      parameters:
+        - $ref: "#/components/parameters/PracticeSessionId"
+      responses:
+        "200":
+          description: Completed practice session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "404":
+          description: Practice session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /practice/sessions/{id}/abandon:
+    post:
+      operationId: abandonPracticeSession
+      tags: [practice]
+      summary: Abandon an unfinished learner practice session
+      parameters:
+        - $ref: "#/components/parameters/PracticeSessionId"
+      responses:
+        "200":
+          description: Abandoned practice session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "400":
+          description: Session cannot be abandoned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Practice session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /progress/dashboard:
+    get:
+      operationId: getDashboardProgress
+      tags: [practice]
+      summary: Get learner dashboard progress
+      description: Finalizes expired timed sessions before calculating dashboard progress.
+      responses:
+        "200":
+          description: Learner dashboard progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardProgress"
+  /bookmarks:
+    get:
+      operationId: listBookmarks
+      tags: [practice]
+      summary: List learner bookmarks
+      responses:
+        "200":
+          description: Learner bookmark question IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  /bookmarks/questions:
+    get:
+      operationId: listBookmarkQuestions
+      tags: [practice]
+      summary: List the learner's saved questions
+      responses:
+        "200":
+          description: Saved learner questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+        "400":
+          description: Learner identity is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /bookmarks/{questionId}:
+    put:
+      operationId: updateBookmark
+      tags: [practice]
+      summary: Save or remove a learner bookmark
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookmarkInput"
+      responses:
+        "200":
+          description: Updated bookmark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "400":
+          description: Invalid bookmark
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: JSON request body exceeds the size limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique UUID for this create operation; reuse it when retrying after an ambiguous failure.
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    QuestionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    PracticeSessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    Domain:
+      name: domain
+      in: query
+      schema:
+        $ref: "#/components/schemas/QuestionDomain"
+    Approach:
+      name: approach
+      in: query
+      schema:
+        $ref: "#/components/schemas/QuestionApproach"
+    Difficulty:
+      name: difficulty
+      in: query
+      schema:
+        $ref: "#/components/schemas/QuestionDifficulty"
+    Search:
+      name: search
+      in: query
+      description: Case-insensitive substring matched against the question topic or text.
+      schema:
+        type: string
+        minLength: 1
+    PageLimit:
+      name: limit
+      in: query
+      description: Maximum number of questions to return. Defaults to 25 and cannot exceed 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    PageOffset:
+      name: offset
+      in: query
+      description: Number of matching questions to skip before the current page.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    AccessAuditAccount:
+      name: account
+      in: query
+      required: false
+      description: Case-insensitive substring matched against the changed account name, email, or ID.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+    AccessAuditActor:
+      name: actor
+      in: query
+      required: false
+      description: Case-insensitive substring matched against the acting administrator name, email, or ID.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl, role]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+          format: email
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [learner, instructor, admin]
+    AdminUser:
+      type: object
+      required: [id, email, firstName, lastName, role, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+          format: email
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          $ref: "#/components/schemas/AuthUserRole"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    InstructorPreferences:
+      type: object
+      required: [pageSize]
+      properties:
+        pageSize:
+          type: integer
+          enum: [10, 25, 50]
+    InstructorPreferencesUpdate:
+      type: object
+      required: [pageSize]
+      properties:
+        pageSize:
+          type: integer
+          enum: [10, 25, 50]
+    AuthUserRole:
+      type: string
+      enum: [learner, instructor, admin]
+    InstructorAccessRole:
+      type: string
+      enum: [learner, instructor]
+    InstructorAccessUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: "#/components/schemas/InstructorAccessRole"
+    AdministratorAccessGrantConfirmation:
+      type: object
+      required: [confirmed]
+      properties:
+        confirmed:
+          type: boolean
+          const: true
+          description: Explicit confirmation that administrator access should be granted.
+    InstructorAccessAuditEntry:
+      type: object
+      required:
+        - id
+        - actorId
+        - actorEmail
+        - actorName
+        - targetId
+        - targetEmail
+        - targetName
+        - previousRole
+        - newRole
+        - changedAt
+      properties:
+        id:
+          type: string
+        actorId:
+          type: string
+        actorEmail:
+          type: ["string", "null"]
+          format: email
+        actorName:
+          type: ["string", "null"]
+        targetId:
+          type: string
+        targetEmail:
+          type: ["string", "null"]
+          format: email
+        targetName:
+          type: ["string", "null"]
+        previousRole:
+          $ref: "#/components/schemas/AuthUserRole"
+        newRole:
+          $ref: "#/components/schemas/AuthUserRole"
+        changedAt:
+          type: string
+          format: date-time
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/AuthUser"
+            - type: "null"
+    QuestionDomain:
+      type: string
+      enum: [People, Process, "Business environment"]
+    QuestionApproach:
+      type: string
+      enum: [agile, predictive, hybrid]
+    QuestionDifficulty:
+      type: string
+      enum: [easy, medium, hard]
+    QuestionStatus:
+      type: string
+      enum: [draft, published, archived]
+    Question:
+      type: object
+      required:
+        - id
+        - domain
+        - topic
+        - approach
+        - difficulty
+        - question
+        - translation
+        - options
+        - correctAnswer
+        - explanation
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        domain:
+          $ref: "#/components/schemas/QuestionDomain"
+        topic:
+          type: string
+          minLength: 1
+        approach:
+          $ref: "#/components/schemas/QuestionApproach"
+        difficulty:
+          $ref: "#/components/schemas/QuestionDifficulty"
+        question:
+          type: string
+          minLength: 1
+        translation:
+          type: string
+        options:
+          type: array
+          minItems: 2
+          maxItems: 6
+          items:
+            type: string
+            minLength: 1
+        correctAnswer:
+          type: integer
+          minimum: 0
+        explanation:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/QuestionStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    InstructorQuestionPagination:
+      type: object
+      required: [offset, limit, total, hasNext, nextOffset]
+      properties:
+        offset:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        hasNext:
+          type: boolean
+        nextOffset:
+          type: ["integer", "null"]
+          minimum: 0
+    InstructorQuestionPage:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        pagination:
+          $ref: "#/components/schemas/InstructorQuestionPagination"
+    QuestionInput:
+      type: object
+      required:
+        - domain
+        - topic
+        - approach
+        - difficulty
+        - question
+        - translation
+        - options
+        - correctAnswer
+        - explanation
+      properties:
+        domain:
+          $ref: "#/components/schemas/QuestionDomain"
+        topic:
+          type: string
+          minLength: 1
+        approach:
+          $ref: "#/components/schemas/QuestionApproach"
+        difficulty:
+          $ref: "#/components/schemas/QuestionDifficulty"
+        question:
+          type: string
+          minLength: 1
+        translation:
+          type: string
+        options:
+          type: array
+          minItems: 2
+          maxItems: 6
+          items:
+            type: string
+            minLength: 1
+        correctAnswer:
+          type: integer
+          minimum: 0
+        explanation:
+          type: string
+          minLength: 1
+    QuestionUpdate:
+      allOf:
+        - $ref: "#/components/schemas/QuestionInput"
+    PracticeMode:
+      type: string
+      enum: [quick, domain, mock]
+    PracticeSessionStatus:
+      type: string
+      enum: [in_progress, completed, abandoned]
+    PracticeCompletionReason:
+      type: string
+      enum: [manual, time_expired]
+    PracticeSessionInput:
+      type: object
+      required: [mode, questionIds, timed]
+      properties:
+        mode:
+          $ref: "#/components/schemas/PracticeMode"
+        domain:
+          type: ["string", "null"]
+        approach:
+          type: ["string", "null"]
+        timed:
+          type: boolean
+        questionIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            minLength: 1
+    PracticeAnswerInput:
+      type: object
+      required: [questionId, selectedAnswer]
+      properties:
+        questionId:
+          type: string
+          minLength: 1
+        selectedAnswer:
+          type: integer
+          minimum: 0
+    PracticeAnswer:
+      type: object
+      required: [id, sessionId, questionId, selectedAnswer, isCorrect, answeredAt]
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        questionId:
+          type: string
+        selectedAnswer:
+          type: integer
+          minimum: 0
+        isCorrect:
+          type: boolean
+        answeredAt:
+          type: string
+          format: date-time
+    PracticeSession:
+      type: object
+      required: [id, mode, timed, questionIds, status, completionReason, score, startedAt, completedAt, questions, answers]
+      properties:
+        id:
+          type: string
+        mode:
+          $ref: "#/components/schemas/PracticeMode"
+        domain:
+          type: ["string", "null"]
+        approach:
+          type: ["string", "null"]
+        timed:
+          type: boolean
+        questionIds:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/PracticeSessionStatus"
+        completionReason:
+          $ref: "#/components/schemas/PracticeCompletionReason"
+        score:
+          type: ["integer", "null"]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAnswer"
+    PracticeSessionSummary:
+      type: object
+      required: [id, mode, score, questionCount, completedAt, completionReason]
+      properties:
+        id:
+          type: string
+        mode:
+          $ref: "#/components/schemas/PracticeMode"
+        score:
+          type: integer
+        questionCount:
+          type: integer
+        completedAt:
+          type: string
+          format: date-time
+        completionReason:
+          $ref: "#/components/schemas/PracticeCompletionReason"
+    RecentActivity:
+      type: object
+      required: [sessionId, score, questionCount, mode, completedAt, completionReason]
+      properties:
+        sessionId:
+          type: string
+        score:
+          type: integer
+        questionCount:
+          type: integer
+        mode:
+          $ref: "#/components/schemas/PracticeMode"
+        completedAt:
+          type: string
+          format: date-time
+        completionReason:
+          $ref: "#/components/schemas/PracticeCompletionReason"
+    DashboardProgress:
+      type: object
+      required: [readinessScore, questionCount, completedSessions, averageScore, studyMinutes, lastScore, recentActivity]
+      properties:
+        readinessScore:
+          type: integer
+        questionCount:
+          type: integer
+        completedSessions:
+          type: integer
+        averageScore:
+          type: integer
+        studyMinutes:
+          type: integer
+        lastScore:
+          type: ["integer", "null"]
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentActivity"
+    BookmarkInput:
+      type: object
+      required: [saved]
+      properties:
+        saved:
+          type: boolean
+    Bookmark:
+      type: object
+      required: [questionId, saved]
+      properties:
+        questionId:
+          type: string
+        saved:
+          type: boolean
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+

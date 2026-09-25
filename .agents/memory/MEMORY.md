@@ -1,0 +1,8 @@
+- [Generated client DOM types](generated-client-dom-types.md) — Orval query helpers use Headers.entries, so the client TypeScript lib needs dom.iterable.
+- [API validation prerequisites](api-validation-prerequisites.md) — Fresh workspaces need generated library declarations and the development schema before DB-backed API checks.
+- [Python shell side effect](python-shell-side-effect.md) — Running Python commands can add python-base to .replit; restore protected config before finishing.
+- [Package install config side effect](package-install-config-side-effect.md) — Workspace installs may add unrelated protected .replit Nix config; validate and restore it before finishing.
+- [Workspace links before browser checks](workspace-links-before-browser-checks.md) — Run the workspace install and build library declarations before Vite browser validation in a fresh checkout.
+- [Instructor UI browser harness](instructor-ui-browser-harness.md) — Run Chromium/CDP tests serially and set page state only after reaching the app origin.
+- [Local OIDC integration test provider](oidc-test-provider.md) — Mock discovery and callback endpoints over temporary HTTPS because openid-client rejects plain HTTP providers.
+- [Terminal practice-session cache](terminal-practice-session-cache.md) — Remove only the terminal session from the resumable list so siblings remain visible if refetch fails.

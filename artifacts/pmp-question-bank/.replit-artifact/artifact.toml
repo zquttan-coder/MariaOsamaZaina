@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "PMP Question Bank"
+description = "A focused study companion for PMP candidates to configure practice sessions, work through scenario-based questions, and review progress across domains and project approaches."
+version = "1.0.0"
+id = "artifacts/pmp-question-bank"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23132
+
+[services.development]
+run = "pnpm --filter @workspace/pmp-question-bank run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pmp-question-bank", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pmp-question-bank/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23132"
+BASE_PATH = "/"
